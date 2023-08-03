@@ -72,9 +72,11 @@ def resample_dicom(source: str, destination: str, dx: Optional[float], dy: Optio
     # Get all DICOM tags
     m = image.GetDirection()
     all_tags = {tag: reader.GetMetaData(0, tag) for tag in reader.GetMetaDataKeys(0)}
+
+    # Add/update the series time stamp, image type and image orientation.
     now = datetime.now()
-    all_tags["0008|0021"], datetime.strftime(now, "%Y%m%d"),  # Series Date
-    all_tags["0008|0031"], datetime.strftime(now, "%H%M%S"),  # Series Time
+    all_tags["0008|0021"] = datetime.strftime(now, "%Y%m%d")  # Series Date
+    all_tags["0008|0031"] = datetime.strftime(now, "%H%M%S")  # Series Time
     all_tags["0008|0008"] = all_tags.get("0008|0008", "ORIGINAL\\PRIMARY").replace("ORIGINAL", "DERIVED")  # Image Type
     all_tags["0020|000e"] = uid.generate_uid()  # Series Instance UID
     all_tags["0020|0037"] = "\\".join(map(str, (m[0], m[3], m[6], m[1], m[4], m[7])))  # Image Orientation (Patient)
