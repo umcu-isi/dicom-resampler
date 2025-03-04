@@ -23,7 +23,7 @@ def gaussian(image: sitk.Image, sx: float, sy: float, sz: float) -> sitk.Image:
 
     gaussian_filter = sitk.DiscreteGaussianImageFilter()
     gaussian_filter.UseImageSpacingOff()  # We calculated the kernel size in pixels.
-    gaussian_filter.SetVariance(sigma.astype(np.double))
+    gaussian_filter.SetVariance(sigma.astype(np.double) ** 2)
     return gaussian_filter.Execute(image)
 
 
@@ -46,9 +46,9 @@ def resample(image: sitk.Image, dx: float, dy: float, dz: float) -> sitk.Image:
 @click.command()
 @click.argument('source', type=click.Path(exists=True, file_okay=False))
 @click.argument('destination', type=click.Path(dir_okay=True))
-@click.option('--dx', default=None, type=float, help='Pixel spacing in x-direction')
-@click.option('--dy', default=None, type=float, help='Pixel spacing in y-direction')
-@click.option('--dz', default=None, type=float, help='Pixel spacing in z-direction')
+@click.option('--dx', default=None, type=float, help='Pixel spacing in x-direction in mm')
+@click.option('--dy', default=None, type=float, help='Pixel spacing in y-direction in mm')
+@click.option('--dz', default=None, type=float, help='Pixel spacing in z-direction in mm')
 def resample_dicom(source: str, destination: str, dx: Optional[float], dy: Optional[float], dz: Optional[float]):
     print("Reading DICOM series from:", source)
     reader = sitk.ImageSeriesReader()
@@ -64,7 +64,8 @@ def resample_dicom(source: str, destination: str, dx: Optional[float], dy: Optio
     dz = dz if dz else spacing[2]
 
     print("Smoothing volume...")
-    image = gaussian(image, dx / 3.0, dy / 3.0, dz / 3.0)  # Set standard deviation to a third of the new spacing.
+    s = np.sqrt(2 * np.pi)
+    image = gaussian(image, dx / s, dy / s, dz / s)  # Set standard deviation the new spacing / sqrt(2 pi).
 
     print(f"Resampling volume to: {dx:.3f} × {dx:.3f} × {dz:.3f}".format(dx=dx, dy=dy, dz=dz))
     image = resample(image, dx, dy, dz)
@@ -82,7 +83,8 @@ def resample_dicom(source: str, destination: str, dx: Optional[float], dy: Optio
     all_tags["0020|0037"] = "\\".join(map(str, (m[0], m[3], m[6], m[1], m[4], m[7])))  # Image Orientation (Patient)
 
     # Remove optional slice specific tags.
-    del all_tags["0020|1041"]  # Slice Location
+    if "0020|1041" in all_tags:
+        del all_tags["0020|1041"]  # Slice Location
 
     # Set new Slice Thickness.
     if "0018|0050" in all_tags:
